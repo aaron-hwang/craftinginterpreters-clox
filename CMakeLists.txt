@@ -3,13 +3,13 @@ project(clox C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(clox main.c
-        common.h
-        chunk.h
-        chunk.c
-        memory.h
-        memory.c
-        debug.h
-        debug.c
-        value.c
-        value.h)
+add_executable(clox main/main.c
+        main/common.h
+        main/chunk.h
+        main/chunk.c
+        main/memory.h
+        main/memory.c
+        main/debug.h
+        main/debug.c
+        main/value.c
+        main/value.h)

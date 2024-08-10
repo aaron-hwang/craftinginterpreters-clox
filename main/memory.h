@@ -7,6 +7,9 @@
 
 #include "common.h"
 
+/*
+ * A set of macros made to make our lives easier when managing our arrays
+ */
 #define GROW_CAPACITY(capacity) \
 ((capacity) < 8 ? 8 : (capacity) * 2)
 
