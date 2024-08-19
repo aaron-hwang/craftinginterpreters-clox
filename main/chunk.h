@@ -8,14 +8,22 @@
 #include "common.h"
 #include "value.h"
 
+// potentially todo: implement seperate opcodes for "<=", ">=", "!=" for better perf
 typedef enum {
     OP_RETURN,
     OP_CONSTANT,
+    OP_NIL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
     OP_ADD,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
     OP_NEGATE,
+    OP_NOT,
 } OpCode;
 
 typedef struct {
