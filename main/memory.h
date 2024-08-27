@@ -10,6 +10,9 @@
 /*
  * A set of macros made to make our lives easier when managing our arrays
  */
+#define ALLOCATE(type, count) \
+    (type*)reallocate(NULL, 0, sizeof(type) * count)
+
 #define GROW_CAPACITY(capacity) \
 ((capacity) < 8 ? 8 : (capacity) * 2)
 
@@ -19,6 +22,8 @@
 
 #define FREE_ARRAY(type, pointer, oldCount) \
     reallocate(pointer, sizeof(type) * oldCount, 0)
+
+#define FREE(type, pointer) reallocate(pointer, sizeof(type), 0)
 
 /**
  * Reallocate a new chunk of size newSize
@@ -34,5 +39,7 @@
  * oldSize != 0 && newSize > oldSize should grow the existing allocation
  */
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+
+void freeObjects();
 
 #endif

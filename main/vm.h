@@ -20,6 +20,7 @@ typedef struct {
 
     Value stack[STACK_MAX];
     Value* stackTop;
+    Obj* objs;
 } VM;
 
 typedef enum {
