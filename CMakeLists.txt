@@ -20,4 +20,6 @@ add_executable(clox main/main.c
         main/scanner.c
         main/scanner.h
         main/object.h
-        main/object.c)
+        main/object.c
+        main/table.h
+        main/table.c)
