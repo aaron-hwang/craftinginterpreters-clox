@@ -3,6 +3,7 @@
 //
 
 #include "memory.h"
+#include "vm.h"
 
 #include <stdlib.h>
 
@@ -34,7 +35,7 @@ static void freeObject(Obj* object) {
 }
 
 void freeObjects() {
-    Obj* objects = vm.objs;
+    Obj* object = vm.objs;
     while (object != NULL) {
         Obj* next = object->next;
         freeObject(object);

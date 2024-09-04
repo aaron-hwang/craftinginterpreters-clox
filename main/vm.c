@@ -38,8 +38,8 @@ void initVM() {
 }
 
 void freeVM() {
-    freeObjects();
     freeTable(&vm.strings);
+    freeObjects();
 }
 
 void push(Value value) {
@@ -103,8 +103,6 @@ static InterpretResult run() {
         uint8_t instruction;
         switch(instruction = READ_BYTE()) {
             case OP_RETURN: {
-                printValue(pop());
-                printf("\n");
                 return INTERPRET_OK;
             }
             case OP_CONSTANT: {
@@ -121,9 +119,9 @@ static InterpretResult run() {
                 break;
             }
             case OP_ADD: {
-                if (IS_STRING(peek(0) && IS_STRING(peek(1)))) {
+                if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
                     concatenate();
-                } else if IS_NUMBER(peek(0) && IS_NUMBER(peek(1))) {
+                } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
                     BINARY_OP(NUMBER_VAL, +);
                 } else {
                     runtimeError("Operands must be exactly two numbers or two strings");
@@ -156,6 +154,11 @@ static InterpretResult run() {
             }
             case OP_GREATER: BINARY_OP(BOOL_VAL, >); break;
             case OP_LESS: BINARY_OP(BOOL_VAL, <); break;
+            case OP_PRINT: {
+                printValue(pop());
+                printf("\n");
+                break;
+            }
         }
     }
 #undef BINARY_OP
