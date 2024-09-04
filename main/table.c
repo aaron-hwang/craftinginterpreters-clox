@@ -4,6 +4,8 @@
 
 #include "table.h"
 
+#include <string.h>
+
 #include "memory.h"
 #include "object.h"
 
@@ -23,9 +25,18 @@ void freeTable(Table* table) {
 
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
     uint32_t index = key->hash % capacity;
+    Entry* tombstone = NULL;
     for (;;) {
         Entry* entry = &entries[index];
-        if (entry->key == key || entry->key == NULL) {
+        if (entry->key == NULL) {
+            if (IS_NIL(entry->value)) {
+                // Empty entry
+                return tombstone != NULL ? tombstone : entry;
+            } else {
+                // indicates we found a tombstone
+                if (tombstone == NULL) tombstone = entry;
+            }
+        } else if (entry->key == key) {
             return entry;
         }
 
@@ -39,7 +50,7 @@ static void adjustCapacity(Table* table, int capacity) {
         entries[i].key = NULL;
         entries[i].value = NIL_VAL;
     }
-
+    table->count = 0;
     for (int i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
         if (entry->key == NULL) continue;
@@ -47,6 +58,7 @@ static void adjustCapacity(Table* table, int capacity) {
         Entry* dest = findEntry(entries, capacity, entry->key);
         dest->key = entry->key;
         dest->value = entry->value;
+        table->count++;
     }
 
     FREE_ARRAY(Entry, table->entries, table->capacity);
@@ -63,7 +75,8 @@ bool tableSet(Table* table, ObjString* key, Value value) {
 
     Entry* entry = findEntry(table->entries, table->capacity, key);
     bool isNewKey = entry->key == NULL;
-    if (isNewKey) table->count++;
+    // Replacing tomstones will not increment the count
+    if (isNewKey && IS_NIL(entry->value)) table->count++;
 
     entry->key = key;
     entry->value = value;
@@ -76,5 +89,47 @@ void tableAddAll(Table* from, Table* to) {
         if (entry->key != NULL) {
             tableSet(to, entry->key, entry->value);
         }
+    }
+}
+
+bool tableGet(Table* table, ObjString* key, Value* value) {
+    if (table->count == 0) return false;
+
+    Entry* entry = findEntry(table->entries, table->capacity, key);
+    if (entry->key == NULL) return false;
+
+    *value = entry->value;
+    return true;
+}
+
+// We use the tombstoning technique to handle key deletions
+// Return whether or not our deletion attempt was successful
+bool tableDelete(Table* table, ObjString* key) {
+    if (table->count == 0) return false;
+
+    Entry* entry = findEntry(table->entries, table->capacity, key);
+    if (entry->key == NULL) return false;
+
+    // The actual "tombstone"
+    entry->key = NULL;
+    entry->value = BOOL_VAL(true);
+}
+
+ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash) {
+    if (table->count == 0) return NULL;
+
+    uint32_t index = hash % table->capacity;
+    for (;;) {
+        Entry* entry = &table->entries[index];
+        if (entry->key == NULL) {
+            if (IS_NIL(entry->value)) return NULL;
+        } else if (
+            entry->key->length == length
+            && entry->key->hash == hash
+            && memcmp(entry->key->chars, chars, length) == 0) {
+            // we found the key
+            return entry->key;
+        }
+        index = (index + 1) % table->capacity;
     }
 }
