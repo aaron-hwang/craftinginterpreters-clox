@@ -35,9 +35,11 @@ void initVM() {
     resetStack();
     vm.objs = NULL;
     initTable(&vm.strings);
+    initTable(&vm.globals);
 }
 
 void freeVM() {
+    freeTable(&vm.globals);
     freeTable(&vm.strings);
     freeObjects();
 }
@@ -89,6 +91,7 @@ static InterpretResult run() {
         push(valueType(a op b)); \
     } while (false)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
         printf("        ");
@@ -159,11 +162,34 @@ static InterpretResult run() {
                 printf("\n");
                 break;
             }
+            case OP_POP: {
+                pop();
+                break;
+            }
+            case OP_DEFINE_GLOBAL: {
+                ObjString* name = READ_STRING();
+                tableSet(&vm.globals, name, peek(0));
+                pop();
+                break;
+            }
+            case OP_GET_GLOBAL: {
+                ObjString* name = READ_STRING();
+                Value value;
+                if (!tableGet(&vm.globals, name, &value)) {
+                    runtimeError("Undefined global variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(value);
+                break;
+            }
         }
     }
+
+// Mostly to avoid potential accidents later
 #undef BINARY_OP
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 }
 
 InterpretResult interpret(const char* source) {

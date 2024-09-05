@@ -24,6 +24,8 @@ typedef struct {
     Obj* objs;
     // Keeps track of all strings recorded so far, for string interning
     Table strings;
+    // Keeps track of all global variables
+    Table globals;
 } VM;
 
 typedef enum {
