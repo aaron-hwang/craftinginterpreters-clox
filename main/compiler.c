@@ -140,6 +140,14 @@ static void emitReturn() {
     emitByte(OP_RETURN);
 }
 
+static void beginScope() {
+    current->scopeDepth++;
+}
+
+static void endScope() {
+    current->scopeDepth--;
+}
+
 static void endCompiler() {
     emitReturn();
 #ifdef DEBUG_PRINT_CODE
@@ -324,6 +332,15 @@ static void expression() {
     parsePrecedence(PREC_ASSIGNMENT);
 }
 
+static void block() {
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        declaration();
+    }
+
+    consume(TOKEN_RIGHT_BRACE, "Expected a '}' after block");
+}
+
+
 static void printStatement() {
     expression();
     consume(TOKEN_SEMICOLON, "Expect ';' after value");
@@ -400,7 +417,12 @@ static void expressionStatement() {
 static void statement() {
     if (match(TOKEN_PRINT)) {
         printStatement();
-    } else {
+    } else if (match(TOKEN_LEFT_BRACE)) {
+        beginScope();
+        block();
+        endScope();
+    }
+    else {
         expressionStatement();
     }
 }
