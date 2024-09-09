@@ -90,6 +90,8 @@ static InterpretResult run() {
         double a = AS_NUMBER(pop()); \
         push(valueType(a op b)); \
     } while (false)
+#define READ_SHORT() \
+    (vm.ip += 2, (uint16_t)((vm.ip[-2] << 8) | vm.ip[-1]))
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
     for (;;) {
@@ -201,12 +203,19 @@ static InterpretResult run() {
                 vm.stack[slot] = peek(0);
                 break;
             }
-
+            case OP_JUMP_IF_FALSE: {
+                uint16_t offset = READ_SHORT();
+                if (isFalsey(peek(0))) {
+                    vm.ip += offset;
+                }
+                break;
+            }
 
         }
     }
 
 // Mostly to avoid potential accidents later
+#undef READ_SHORT
 #undef BINARY_OP
 #undef READ_BYTE
 #undef READ_CONSTANT
