@@ -69,6 +69,8 @@ static void statement();
 static void declaration();
 static uint8_t identifierConstant(Token* name);
 static int resolveLocal(Compiler* compiler, Token* name);
+static void markInitialized();
+static void and_(bool canAssign);
 
 static Chunk* currentChunk() {
     return compilingChunk;
@@ -136,6 +138,22 @@ static void emitByte(uint8_t byte) {
 static void emitBytes(uint8_t b1, uint8_t b2) {
     emitByte(b1);
     emitByte(b2);
+}
+
+/**
+ * Emits bytecode for a loop
+ * @param loopStart The location in code
+ */
+static void emitLoop(int loopStart) {
+    // Technically could use OP_JUMP for this and just add a signed offset operand
+    emitByte(OP_LOOP);
+
+    int offset = currentChunk()->count - loopStart + 2;
+    // Pretty rare edge case
+    if (offset > UINT16_MAX) error("Loop body too large");
+
+    emitByte((offset >> 8) & 0xff);
+    emitByte(offset & 0xff);
 }
 
 static int emitJump(uint8_t instruction) {
@@ -246,6 +264,16 @@ static void number(bool canAssign) {
     emitConstant(NUMBER_VAL(value));
 }
 
+static void or_(bool canAssign) {
+    int elseJump = emitJump(OP_JUMP_IF_FALSE);
+    int endJump = emitJump(OP_JUMP);
+
+    patchJump(elseJump);
+    emitByte(OP_POP);
+    parsePrecedence(PREC_OR);
+    patchJump(endJump);
+}
+
 static void string(bool canAssign) {
     emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
@@ -317,7 +345,7 @@ ParseRule rules[] = {
   [TOKEN_IDENTIFIER]    = {variable,     NULL,   PREC_NONE},
   [TOKEN_STRING]        = {string,     NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
-  [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_AND]           = {NULL,     and_,   PREC_AND},
   [TOKEN_CLASS]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FALSE]         = {literal,     NULL,   PREC_NONE},
@@ -325,7 +353,7 @@ ParseRule rules[] = {
   [TOKEN_FUN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
   [TOKEN_NIL]           = {literal,     NULL,   PREC_NONE},
-  [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_OR]            = {NULL,     or_,   PREC_OR},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
@@ -383,6 +411,25 @@ static void printStatement() {
     emitByte(OP_PRINT);
 }
 
+static void whileStatement() {
+    // Capture the location in code that the while loop should jump back to
+    int loopStart = currentChunk()->count;
+    consume(TOKEN_LEFT_PAREN, "Expected '(' after while statement");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expected ')' after while statement conditional");
+
+    int exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+    statement();
+    emitLoop(loopStart);
+
+    patchJump(exitJump);
+    emitByte(OP_POP);
+}
+
+/**
+ * Function that helps the compiler to recover from any errors encountered during compilation
+ */
 static void synchronize() {
     parser.panicMode = false;
 
@@ -411,6 +458,14 @@ static void defineVariable(uint8_t global) {
         return;
     }
     emitBytes(OP_DEFINE_GLOBAL, global);
+}
+
+static void and_(bool canAssign) {
+    int endJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+    parsePrecedence(PREC_AND);
+
+    patchJump(endJump);
 }
 
 // Store the string name into the constant table, instruction will refer to the name by its index inthe table
@@ -511,18 +566,77 @@ static void expressionStatement() {
     emitByte(OP_POP);
 }
 
+static void forStatement() {
+    beginScope();
+    consume(TOKEN_LEFT_PAREN, "Expected '(' after 'for' declaration");
+    // Declaration clause
+    if (match(TOKEN_SEMICOLON)) {
+        // We had no declaration
+    } else if (match(TOKEN_VAR)) {
+        varDeclaration();
+    } else {
+        expressionStatement();
+    }
+    consume(TOKEN_SEMICOLON, "Expected ';'");
+
+    int loopStart = currentChunk()->count;
+    // Conditional expression
+    int exitJump = -1;
+    if (!match(TOKEN_SEMICOLON)) {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after loop conditional");
+
+        // Jummp out of loop if condition is false
+        exitJump = emitJump(OP_JUMP_IF_FALSE);
+        emitByte(OP_POP);
+
+    }
+    consume(TOKEN_SEMICOLON, "Expected ';'");
+    // The increment statement. This is convoluted because it is declared before the loop body but executed
+    // afterwards, and our compiler is single pass. Deal with it.
+    if (!match(TOKEN_RIGHT_PAREN)) {
+        int bodyJump = emitJump(OP_JUMP);
+        int incrementStart = currentChunk()->count;
+        expression();
+        emitByte(OP_POP);
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses");
+
+        emitLoop(loopStart);
+        patchJump(bodyJump);
+    }
+
+    statement();
+    emitLoop(loopStart);
+    if (exitJump == -1) {
+        patchJump(exitJump);
+        emitByte(OP_POP);
+    }
+
+    endScope();
+}
+
 static void ifStatement() {
     consume(TOKEN_LEFT_PAREN, "Expected '(' after if declaration");
     expression();
     consume(TOKEN_RIGHT_PAREN, "Expected ')' to close conditonal of if statement");
 
     int thenJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
     statement();
+
+    int elseJump = emitJump(OP_JUMP);
 
     // Backpatching technique: we don't know how many bytes to actually jump until we compile the 'then'
     // branch of the conditional, so we first use a placeholder value, and then replace it after we
     // compile the code properly
     patchJump(thenJump);
+    emitByte(OP_POP);
+
+    if (match(TOKEN_ELSE)) {
+        statement();
+    }
+    patchJump(elseJump);
+
 }
 
 static void statement() {
@@ -535,7 +649,12 @@ static void statement() {
     } else if (match(TOKEN_IF)) {
         ifStatement();
     }
-
+    else if (match(TOKEN_WHILE)) {
+        whileStatement();
+    }
+    else if (match(TOKEN_FOR)) {
+        forStatement();
+    }
     else {
         expressionStatement();
     }
