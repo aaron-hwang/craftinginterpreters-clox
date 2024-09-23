@@ -205,6 +205,7 @@ static ObjFunction* endCompiler() {
     return function;
 }
 
+// Handles binary operators (+, *, /, -)
 static void binary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
     ParseRule* rule = getRule(operatorType);
@@ -226,6 +227,11 @@ static void binary(bool canAssign) {
         case TOKEN_EQUAL_EQUAL: emitByte(OP_EQUAL); break;
         default: return;
     }
+}
+
+static void call(bool canAssign) {
+    uint8_t argcount = argumentList();
+    emitBytes(OP_CALL, argcount);
 }
 
 static void literal(bool canAssign) {
@@ -351,7 +357,7 @@ static void unary(bool canAssign) {
 // Lookup table for parsing every operator, where left is the function to use when parsing it as a prefix operator,
 // middle is function pointer for when it is used as an infix operator, and said operator's precedence.
 ParseRule rules[] = {
-  [TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
+  [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_NONE},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
@@ -522,6 +528,22 @@ static void defineVariable(uint8_t global) {
         return;
     }
     emitBytes(OP_DEFINE_GLOBAL, global);
+}
+
+static uint8_t argumentList() {
+    uint8_t argCount = 0;
+    if (!check(TOKEN_RIGHT_PAREN)) {
+        do {
+            expression();
+            if (argCount >= 255) {
+                error("Cannot have more than 255 arguments for a function");
+            }
+            argCount++;
+        } while (match(TOKEN_COMMA));
+    }
+
+    consume(TOKEN_RIGHT_PAREN, "Expected ')' after arguments");
+    return argCount;
 }
 
 static void and_(bool canAssign) {
