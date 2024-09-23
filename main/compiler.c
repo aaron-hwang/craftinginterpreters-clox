@@ -482,6 +482,21 @@ static void printStatement() {
     emitByte(OP_PRINT);
 }
 
+// Logic to handle a return statement
+static void returnStatement() {
+    // We tried to return from a top level declaration/expression
+    if (current->type == TYPE_SCRIPT) {
+        error("Canot return from top level code");
+    }
+    if (match(TOKEN_SEMICOLON)) {
+        emitReturn();
+    } else {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after return statement");
+        emitByte(OP_RETURN);
+    }
+}
+
 static void whileStatement() {
     // Capture the location in code that the while loop should jump back to
     int loopStart = currentChunk()->count;
@@ -738,6 +753,8 @@ static void statement() {
         endScope();
     } else if (match(TOKEN_IF)) {
         ifStatement();
+    } else if (match(TOKEN_RETURN)) {
+        returnStatement();
     }
     else if (match(TOKEN_WHILE)) {
         whileStatement();
