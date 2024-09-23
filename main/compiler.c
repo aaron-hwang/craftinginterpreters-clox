@@ -67,7 +67,7 @@ typedef struct {
 
 Parser parser;
 Compiler* current = NULL;
-Chunk* compilingChunk;
+//Chunk* compilingChunk;
 
 // Prototypes for very important functions
 static void expression();
@@ -686,11 +686,11 @@ static void statement() {
  * @param chunk The chunk we throw our compiled code data into
  * @return A pointer to the function object
  */
-ObjFunction* compile(const char* source, Chunk* chunk) {
+ObjFunction* compile(const char* source) {
     initScanner(source);
     Compiler compiler;
     initCompiler(&compiler, TYPE_SCRIPT);
-    compilingChunk = chunk;
+    //compilingChunk = chunk;
     parser.panicMode = false;
     parser.hadError = false;
     advance();
