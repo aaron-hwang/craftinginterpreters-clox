@@ -26,10 +26,24 @@ static void runtimeError(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    CallFrame* frame = &vm.frames[vm.frameCount - 1];
-    size_t instruction = frame->ip - frame->function->chunk.code - 1;
-    int line = frame->function->chunk.lines[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
+    // Stack trace!!
+    // Start from vm.frameCount - 1 because ip is sitting on an instruction waiting to be executed,
+    /* but stack trace should start from previous instruction (where it failed)
+     */
+    for (int i = vm.frameCount - 1; i >= 0; i--) {
+        CallFrame* frame = &vm.frames[i];
+        ObjFunction* function = frame->function;
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+
+        // We are in the top level
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            // We are in some other function
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
     resetStack();
 }
 
@@ -61,6 +75,16 @@ static Value peek(int distance) {
 }
 
 static bool call(ObjFunction* function, int argc) {
+    if (function->arity != argc) {
+        runtimeError("Expected %d arguments, but got %d", function->arity, argc);
+        return false;
+    }
+
+    if (vm.frameCount == FRAMES_MAX) {
+        runtimeError("STACK OVERFLOW");
+        return false;
+    }
+
     CallFrame* frame = &vm.frames[vm.frameCount++];
     frame->function = function;
     frame->ip = function->chunk.code;
@@ -138,7 +162,18 @@ static InterpretResult run() {
         uint8_t instruction;
         switch(instruction = READ_BYTE()) {
             case OP_RETURN: {
-                return INTERPRET_OK;
+                Value result = pop();
+                vm.frameCount--;
+                // We returned from the top level successfully
+                if (vm.frameCount == 0) {
+                    pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.stackTop = frame->slots;
+                push(result);
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
             }
             case OP_CONSTANT: {
                 Value constant = READ_CONSTANT();

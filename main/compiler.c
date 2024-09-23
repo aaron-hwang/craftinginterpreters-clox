@@ -82,6 +82,7 @@ static void markInitialized();
 static void and_(bool canAssign);
 static void defineVariable(uint8_t global);
 static uint8_t parseVariable(const char* message);
+static uint8_t argumentList();
 
 static Chunk* currentChunk() {
     return &current->function->chunk;
@@ -175,6 +176,7 @@ static int emitJump(uint8_t instruction) {
 }
 
 static void emitReturn() {
+    emitByte(OP_NIL);
     emitByte(OP_RETURN);
 }
 
