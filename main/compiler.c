@@ -51,7 +51,15 @@ typedef struct {
     int depth;
 } Local;
 
+typedef enum {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} FunctionType;
+
 typedef struct {
+    ObjFunction* function;
+    FunctionType type;
+
     Local locals[UINT8_COUNT];
     int localCount;
     int scopeDepth;
@@ -73,7 +81,7 @@ static void markInitialized();
 static void and_(bool canAssign);
 
 static Chunk* currentChunk() {
-    return compilingChunk;
+    return &current->function->chunk;
 }
 
 static void errorAt(Token* token, const char* message) {
@@ -181,13 +189,16 @@ static void endScope() {
     }
 }
 
-static void endCompiler() {
+static ObjFunction* endCompiler() {
     emitReturn();
+    ObjFunction* function = current->function;
 #ifdef DEBUG_PRINT_CODE
     if (!parser.hadError) {
-        disassembleChunk(currentChunk(), "code");
+        disassembleChunk(currentChunk(), function->name != NULL ? function->name->chars : "<script>");
     }
 #endif
+
+    return function;
 }
 
 static void binary(bool canAssign) {
@@ -253,10 +264,19 @@ static void patchJump(int offset) {
     currentChunk()->code[offset + 1] = (jump & 0xff);
 }
 
-static void initCompiler(Compiler* compiler) {
+static void initCompiler(Compiler* compiler, FunctionType type) {
+    compiler->function = NULL;
+    compiler->type = type;
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
+    compiler->function = newFunction();
     current = compiler;
+
+    // Implciitly claims slot 0 of the locals slot for the vm to use (top level defs)
+    Local* local = &current->locals[current->localCount++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
 }
 
 static void number(bool canAssign) {
@@ -660,10 +680,16 @@ static void statement() {
     }
 }
 
-bool compile(const char* source, Chunk* chunk) {
+/**
+ * Compiles the given source of characters into a given chunk
+ * @param source The source code
+ * @param chunk The chunk we throw our compiled code data into
+ * @return A pointer to the function object
+ */
+ObjFunction* compile(const char* source, Chunk* chunk) {
     initScanner(source);
     Compiler compiler;
-    initCompiler(&compiler);
+    initCompiler(&compiler, TYPE_SCRIPT);
     compilingChunk = chunk;
     parser.panicMode = false;
     parser.hadError = false;
@@ -671,6 +697,6 @@ bool compile(const char* source, Chunk* chunk) {
     while(!match(TOKEN_EOF)) {
         declaration();
     }
-    endCompiler();
-    return !parser.hadError;
+    ObjFunction* function = endCompiler();
+    return parser.hadError ? NULL : function;
 }

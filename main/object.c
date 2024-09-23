@@ -85,6 +85,11 @@ ObjString* copyString(const char* chars, int length) {
 }
 
 static void printFunction(ObjFunction* function) {
+    // handles the special case of the vm's own allocated function slot
+    if (function->name == NULL) {
+        printf("<script>");
+        return;
+    }
     printf("<fn> %s", function->name->chars);
 }
 
