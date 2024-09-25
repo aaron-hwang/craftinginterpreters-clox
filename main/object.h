@@ -12,14 +12,19 @@
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+#define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
+#define AS_NATIVE(value) \
+    ((ObjNative*)AS_OBJ(value))->function
 
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
+    // Special type of object, native functions
+    OBJ_NATIVE,
 } ObjType;
 
 struct Obj {
@@ -35,6 +40,16 @@ typedef struct {
     Chunk chunk;
     ObjString* name;
 } ObjFunction;
+
+// We need these for native functions. Basically wrappers for native C code.
+typedef Value (*NativeFn)(int argc, Value* args);
+
+typedef struct {
+    Obj obj;
+    NativeFn function;
+} ObjNative;
+
+ObjNative* newNative(NativeFn native);
 
 ObjFunction* newFunction();
 

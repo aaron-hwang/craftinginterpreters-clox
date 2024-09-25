@@ -35,6 +35,17 @@ ObjFunction* newFunction() {
 }
 
 /**
+ * Creates a new function object from a prexisting
+ * @param function
+ * @return a pointer to the newly allocated object representing the function
+ */
+ObjNative* newNative(NativeFn function) {
+    ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+    native->function = function;
+    return native;
+}
+
+/**
  * Allocates a Lox String, and interns it for future lookup
  * @param chars The raw C string we are allocating
  * @param length tne length of said string
@@ -99,11 +110,16 @@ static void printFunction(ObjFunction* function) {
  */
 void printObject(Value value) {
     switch (OBJ_TYPE(value)) {
-        case OBJ_STRING:
+        case OBJ_STRING: {
             printf("%s", AS_CSTRING(value));
-        break;
+            break;
+        }
         case OBJ_FUNCTION: {
             printFunction(AS_FUNCTION(value));
+            break;
+        }
+        case OBJ_NATIVE: {
+            printf("<native fn>");
             break;
         }
         default: return;

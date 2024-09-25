@@ -1,0 +1,7 @@
+fun suc(n) {
+    if (n <= 1) return n;
+    var a = suc(n - 1);
+    return 1 + a;
+}
+
+print suc(1);

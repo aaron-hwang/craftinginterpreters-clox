@@ -328,9 +328,9 @@ static void namedVariable(Token name, bool canAssign) {
 
     if (canAssign && match(TOKEN_EQUAL)) {
         expression();
-        emitBytes(setOp, arg);
+        emitBytes(setOp, (uint8_t)arg);
     } else {
-        emitBytes(getOp, arg);
+        emitBytes(getOp, (uint8_t)arg);
     }
 
 }
@@ -359,7 +359,7 @@ static void unary(bool canAssign) {
 // Lookup table for parsing every operator, where left is the function to use when parsing it as a prefix operator,
 // middle is function pointer for when it is used as an infix operator, and said operator's precedence.
 ParseRule rules[] = {
-  [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_NONE},
+  [TOKEN_LEFT_PAREN]    = {grouping, call,   PREC_CALL},
   [TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
   [TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
@@ -492,7 +492,7 @@ static void returnStatement() {
         emitReturn();
     } else {
         expression();
-        consume(TOKEN_SEMICOLON, "Expect ';' after return statement");
+        consume(TOKEN_SEMICOLON, "Expect ';' after return value");
         emitByte(OP_RETURN);
     }
 }
@@ -539,7 +539,6 @@ static void synchronize() {
 }
 
 static void defineVariable(uint8_t global) {
-    if (current->scopeDepth == 0) return;
     if (current->scopeDepth > 0) {
         markInitialized();
         return;
