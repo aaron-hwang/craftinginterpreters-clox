@@ -4,4 +4,4 @@ fun suc(n) {
     return 1 + a;
 }
 
-print suc(1);
+print "hi";

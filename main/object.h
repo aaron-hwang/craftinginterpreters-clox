@@ -34,7 +34,7 @@ struct Obj {
 
 // In lox, functions are first class.
 typedef struct {
-    Obj* obj;
+    Obj obj;
     // The number of parameters a function expects
     int arity;
     Chunk chunk;
