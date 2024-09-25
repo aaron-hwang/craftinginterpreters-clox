@@ -11,6 +11,10 @@
 
 extern VM vm;
 
+// Macro for allocating objects.
+#define ALLOCATE_OBJ(type, objectType) \
+(type*)allocateObject(sizeof(type), objectType)
+
 static Obj* allocateObject(size_t size, ObjType type) {
     Obj* object = (Obj*)reallocate(NULL, 0, size);
     object->type = type;
@@ -18,9 +22,12 @@ static Obj* allocateObject(size_t size, ObjType type) {
     vm.objs = object;
     return object;
 }
-// Macro for allocating objects.
-#define ALLOCATE_OBJ(type, objectType) \
-    (type*)allocateObject(sizeof(type), objectType)
+
+ObjClosure* newClosure(ObjFunction* function) {
+    ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+    closure->function = function;
+    return closure;
+}
 
 /**
  * Initializes a new instance of a Lox Function
@@ -120,6 +127,10 @@ void printObject(Value value) {
         }
         case OBJ_NATIVE: {
             printf("<native fn>");
+            break;
+        }
+        case OBJ_CLOSURE: {
+            printFunction(AS_CLOSURE(value)->function);
             break;
         }
         default: return;

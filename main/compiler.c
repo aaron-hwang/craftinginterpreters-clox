@@ -464,7 +464,7 @@ static void function(FunctionType type) {
 
     // Ending compiler implicitly "ends" the scope
     ObjFunction* function = endCompiler();
-    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+    emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
 }
 

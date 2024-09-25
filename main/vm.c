@@ -37,7 +37,7 @@ static void runtimeError(const char* format, ...) {
      */
     for (int i = vm.frameCount - 1; i >= 0; i--) {
         CallFrame* frame = &vm.frames[i];
-        ObjFunction* function = frame->function;
+        ObjFunction* function = frame->closure->function;
         size_t instruction = frame->ip - function->chunk.code - 1;
         fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
 
@@ -95,9 +95,9 @@ static Value peek(int distance) {
     return vm.stackTop[-1 - distance];
 }
 
-static bool call(ObjFunction* function, int argc) {
-    if (function->arity != argc) {
-        runtimeError("Expected %d arguments, but got %d", function->arity, argc);
+static bool call(ObjClosure* closure, int argc) {
+    if (closure->function->arity != argc) {
+        runtimeError("Expected %d arguments, but got %d", closure->function->arity, argc);
         return false;
     }
 
@@ -107,8 +107,8 @@ static bool call(ObjFunction* function, int argc) {
     }
 
     CallFrame* frame = &vm.frames[vm.frameCount++];
-    frame->function = function;
-    frame->ip = function->chunk.code;
+    frame->closure = closure;
+    frame->ip = closure->function->chunk.code;
     frame->slots = vm.stackTop - argc - 1;
     return true;
 }
@@ -122,14 +122,15 @@ static bool call(ObjFunction* function, int argc) {
 static bool callValue(Value callee, int argcount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
-            case OBJ_FUNCTION:
-                return call(AS_FUNCTION(callee), argcount);
             case OBJ_NATIVE:
                 NativeFn function = AS_NATIVE(callee);
                 Value result = function(argcount, vm.stackTop - argcount);
                 vm.stackTop -= argcount + 1;
                 push(result);
                 return true;
+            case OBJ_CLOSURE: {
+                return call(AS_CLOSURE(callee), argcount);
+            }
             default:
                 break; // Not a callable object type
         }
@@ -173,7 +174,7 @@ static InterpretResult run() {
     } while (false)
 #define READ_SHORT() \
     (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
-#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
+#define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
     for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
@@ -184,7 +185,7 @@ static InterpretResult run() {
             printf("  ]");
         }
         printf("\n");
-        disassembleInstruction(&frame->function->chunk, (int)(frame->ip - frame->function->chunk.code));
+        disassembleInstruction(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
 #endif
         uint8_t instruction;
         switch(instruction = READ_BYTE()) {
@@ -320,6 +321,12 @@ static InterpretResult run() {
                 frame = &vm.frames[vm.frameCount - 1];
                 break;
             }
+            case OP_CLOSURE: {
+                ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
+                ObjClosure* closure = newClosure(function);
+                push(OBJ_VAL(closure));
+                break;
+            }
         }
     }
 
@@ -331,12 +338,22 @@ static InterpretResult run() {
 #undef READ_STRING
 }
 
+/**
+ * Interprets some given source code
+ * @param source Source code to interpret
+ * @return Whether the code was interpreted successfully, or if there was a compile/runtime error.
+ */
 InterpretResult interpret(const char* source) {
     ObjFunction* function = compile(source);
     if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
+    // Pushing the raw function object is still useful even if we immediately pop it off afterwards;
+    // It keeps the gc aware of our heap allocated objects
     push(OBJ_VAL(function));
-    call(function, 0);
+    ObjClosure* closure = newClosure(function);
+    pop();
+    push(OBJ_VAL(closure));
+    call(closure, 0);
 
     return run();
 }

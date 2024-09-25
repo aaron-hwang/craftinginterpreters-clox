@@ -41,6 +41,11 @@ static void freeObject(Obj* object) {
             FREE(ObjNative, object);
             break;
         }
+        case OBJ_CLOSURE: {
+            // Only frees the surrounding enclosure since multiple closures can contain the same exact function
+            FREE(ObjClosure, object);
+            break;
+        }
     }
 }
 
