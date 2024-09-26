@@ -15,6 +15,7 @@
 
 VM vm;
 
+// Redundant params that are necessary due to our definition of a NativeFn
 static Value clockNative(int argcount, Value* args) {
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
@@ -24,6 +25,7 @@ static void resetStack() {
     vm.frameCount = 0;
 }
 
+// Error handling!
 static void runtimeError(const char* format, ...) {
     va_list args;
     va_start(args, format);
@@ -52,6 +54,11 @@ static void runtimeError(const char* format, ...) {
     resetStack();
 }
 
+/**
+ * Helper function for defining native functions goes here.
+ * @param name The name of the native function to be defined
+ * @param function The actual function the name will be bound to
+ */
 static void defineNative(const char* name, NativeFn function) {
     // We push and pop the function name and function object onto the stack because
     /** copyString and newNative both dynamically allocate memory, so our GC needs to know we still need
@@ -64,7 +71,7 @@ static void defineNative(const char* name, NativeFn function) {
     pop();
 
 }
-
+// Setup
 void initVM() {
     resetStack();
     vm.objs = NULL;
@@ -74,7 +81,7 @@ void initVM() {
     // Native functions go HERE
     defineNative("clock", clockNative);
 }
-
+// Cleaning up after ourselves
 void freeVM() {
     freeTable(&vm.globals);
     freeTable(&vm.strings);
@@ -95,6 +102,12 @@ static Value peek(int distance) {
     return vm.stackTop[-1 - distance];
 }
 
+/**
+ * Calls a given functikon closure (and the underlying function)
+ * @param closure The closure we are calling
+ * @param argc The amount of arguments we are using
+ * @return Whether or not the function call was succesful
+ */
 static bool call(ObjClosure* closure, int argc) {
     if (closure->function->arity != argc) {
         runtimeError("Expected %d arguments, but got %d", closure->function->arity, argc);
@@ -139,10 +152,15 @@ static bool callValue(Value callee, int argcount) {
     return false;
 }
 
+static ObjUpvalue* captureUpvalue(Value* local) {
+    ObjUpvalue* createdUpvalue = newUpvalue(local);
+    return createdUpvalue;
+}
+
 static bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
-
+// Concatenates two strings together
 static void concatenate() {
     ObjString* b = AS_STRING(pop());
     ObjString* a = AS_STRING(pop());
@@ -157,7 +175,7 @@ static void concatenate() {
     push(OBJ_VAL(result));
 }
 
-// The main function of our VM
+// The main function of our VM, the "beating heart" so to speak.
 static InterpretResult run() {
     CallFrame* frame = &vm.frames[vm.frameCount - 1];
 #define READ_BYTE() (*frame->ip++)
@@ -325,6 +343,26 @@ static InterpretResult run() {
                 ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
                 ObjClosure* closure = newClosure(function);
                 push(OBJ_VAL(closure));
+
+                for (int i = 0; i < closure->upvalueCount; i++) {
+                    uint8_t isLocal = READ_BYTE();
+                    uint8_t index = READ_BYTE();
+                    if (isLocal) {
+                        closure->upvalues[i] = captureUpvalue(frame->slots + index);
+                    } else {
+                        closure->upvalues[i] =  frame->closure->upvalues[index];
+                    }
+                }
+                break;
+            }
+            case OP_GET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                push(*frame->closure->upvalues[slot]->location);
+                break;
+            }
+            case OP_SET_UPVALUE: {
+                uint8_t slot = READ_BYTE();
+                *frame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
         }
@@ -339,7 +377,7 @@ static InterpretResult run() {
 }
 
 /**
- * Interprets some given source code
+ * Interprets some given source code, and executes the result if successful.
  * @param source Source code to interpret
  * @return Whether the code was interpreted successfully, or if there was a compile/runtime error.
  */

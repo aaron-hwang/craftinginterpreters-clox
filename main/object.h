@@ -1,7 +1,10 @@
 //
 // Created by aaron on 8/19/2024.
 //
-
+/**
+ * This file holds all the structs and useful macros for defining what constitutes as an 'Object' in Lox.
+ * This is where we also hold most/all of the runtime representations for core language features, like functions, closures, and upvalues.
+ */
 #ifndef clox_object_h
 #define clox_object_h
 
@@ -28,6 +31,7 @@ typedef enum {
     // Special type of object, native functions
     OBJ_NATIVE,
     OBJ_CLOSURE,
+    OBJ_UPVALUE,
 } ObjType;
 
 struct Obj {
@@ -40,6 +44,7 @@ typedef struct {
     Obj obj;
     // The number of parameters a function expects
     int arity;
+    int upvalueCount;
     Chunk chunk;
     ObjString* name;
 } ObjFunction;
@@ -63,10 +68,22 @@ struct ObjString {
     uint32_t hash;
 };
 
+// The runtime representation of an upvalue
+typedef struct ObjUpvalue {
+    Obj obj;
+    // Important that this is a pointer, as it needs to be aware of any changes to the variable that happen at runtime
+    Value* location;
+} ObjUpvalue;
+
+ObjUpvalue* newUpvalue(Value* slot);
+
 // A struct that represents the closure for a given function
 typedef struct {
     Obj obj;
     ObjFunction* function;
+    ObjUpvalue** upvalues;
+    // More for the GC than anything else, because technically the function already knows their own upvalue count
+    int upvalueCount;
 } ObjClosure;
 
 ObjClosure* newClosure(ObjFunction* function);

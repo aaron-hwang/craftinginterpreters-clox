@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "value.h"
 
+// A parser takes a list of
 typedef struct {
     Token current;
     Token previous;
@@ -46,16 +47,26 @@ typedef struct {
     Precedence precedence;
 } ParseRule;
 
+// Struct representing a local variable
 typedef struct {
     Token name;
     int depth;
 } Local;
+
+// Struct that represents upvalues;
+typedef struct {
+    // The local slot that the upvalue captures
+    uint8_t index;
+    bool isLocal;
+} Upvalue;
 
 typedef enum {
     TYPE_FUNCTION,
     TYPE_SCRIPT,
 } FunctionType;
 
+// The compiler of a given function; At a high level, lox starts in an empty top level function,
+// A "main" function of sorts internally.
 typedef struct Compiler{
     struct Compiler* enclosing;
     ObjFunction* function;
@@ -64,6 +75,8 @@ typedef struct Compiler{
     Local locals[UINT8_COUNT];
     int localCount;
     int scopeDepth;
+    // Simpler to have a (large) fixed amount of upvalues
+    Upvalue upvalues[UINT8_COUNT];
 } Compiler;
 
 Parser parser;
@@ -83,6 +96,7 @@ static void and_(bool canAssign);
 static void defineVariable(uint8_t global);
 static uint8_t parseVariable(const char* message);
 static uint8_t argumentList();
+static int resolveUpvalue(Compiler* compiler, Token* name);
 
 static Chunk* currentChunk() {
     return &current->function->chunk;
@@ -320,7 +334,11 @@ static void namedVariable(Token name, bool canAssign) {
     if (arg != -1) {
         getOp = OP_GET_LOCAL;
         setOp = OP_SET_LOCAL;
-    } else {
+    } else if ((arg = resolveUpvalue(current, &name)) != -1) {
+        getOp = OP_GET_UPVALUE;
+        setOp = OP_SET_UPVALUE;
+    }
+    else {
         arg = identifierConstant(&name);
         getOp = OP_GET_GLOBAL;
         setOp = OP_SET_GLOBAL;
@@ -466,6 +484,10 @@ static void function(FunctionType type) {
     ObjFunction* function = endCompiler();
     emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
+    for (int i = 0; i < function->upvalueCount; i++) {
+        emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+        emitByte(compiler.upvalues[i].index);
+    }
 }
 
 static void funDeclaration() {
@@ -589,6 +611,44 @@ static int resolveLocal(Compiler* compiler, Token* name) {
             }
             return i;
         }
+    }
+
+    return -1;
+}
+
+static int addUpvalue(Compiler* compiler, uint8_t index, bool isLocal) {
+    int upvalueCount = compiler->function->upvalueCount;
+
+    for (int i = 0; i < upvalueCount; i++) {
+        Upvalue* upvalue = &compiler->upvalues[i];
+        if (upvalue->index == index && upvalue->isLocal == isLocal) {
+            return i;
+        }
+    }
+
+    if (upvalueCount == UINT8_COUNT) {
+        error("Too many variables in function closure");
+        return 0;
+    }
+
+    compiler->upvalues[upvalueCount].isLocal = isLocal;
+    compiler->upvalues[upvalueCount].index = index;
+    return compiler->function->upvalueCount++;
+}
+
+static int resolveUpvalue(Compiler* compiler, Token* name) {
+    if (compiler->enclosing == NULL) return -1;
+
+    // First, look for a matching local variable in the enclosing function
+    int local = resolveLocal(compiler->enclosing, name);
+    if (local != -1) {
+        return addUpvalue(compiler, (uint8_t)local, true);
+    }
+
+    // If we don't find a matching local in the enclosing, we recurse on our encosing compiler to see if it's there
+    int upvalue = resolveUpvalue(compiler->enclosing, name);
+    if (upvalue != -1) {
+        return addUpvalue(compiler, (uint8_t)upvalue, false);
     }
 
     return -1;

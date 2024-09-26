@@ -42,8 +42,15 @@ static void freeObject(Obj* object) {
             break;
         }
         case OBJ_CLOSURE: {
+            ObjClosure* closure = (ObjClosure*)object;
+            FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
             // Only frees the surrounding enclosure since multiple closures can contain the same exact function
             FREE(ObjClosure, object);
+            break;
+        }
+        // Multiple closures could refer to the same value the upvalue refers to, so here we only free the wrapping struct
+        case OBJ_UPVALUE: {
+            FREE(ObjUpvalue, object);
             break;
         }
     }
