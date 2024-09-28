@@ -32,6 +32,8 @@ typedef struct {
     Obj* objs;
     // Keeps track of all strings recorded so far, for string interning
     Table strings;
+
+	ObjUpvalue* openUpvalues;
     // Keeps track of all global variables
     Table globals;
 } VM;
