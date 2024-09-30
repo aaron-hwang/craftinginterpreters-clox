@@ -6,6 +6,8 @@
 #define clox_memory_h
 
 #include "common.h"
+#include "value.h"
+#include "table.h"
 
 /*
  * A set of macros made to make our lives easier when managing our arrays
@@ -39,7 +41,11 @@
  * oldSize != 0 && newSize > oldSize should grow the existing allocation
  */
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
-
+// Helpers for garbage collector
+void markObject(Obj* obj);
+void markValue(Value value);
+// THE garbage collection function.
+void collectGarbage();
 void freeObjects();
 
 #endif

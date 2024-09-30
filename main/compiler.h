@@ -8,5 +8,7 @@
 #include "object.h"
 
 ObjFunction* compile(const char* source);
+// Helper function for GC
+void markCompilerRoots();
 
 #endif //COMPILER_H

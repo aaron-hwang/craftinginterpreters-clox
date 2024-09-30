@@ -29,5 +29,7 @@ bool tableGet(Table* table, ObjString* key, Value* value);
 bool tableDelete(Table* table, ObjString* key);
 // Checks to see if 'chars' already exists in our table. Mainly used for string interning.
 ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash);
-
+// Helper function for GC
+// Note: Maybe move to memory header file instead?
+void markTable(Table* table);
 #endif

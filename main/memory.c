@@ -11,8 +11,20 @@
 
 #include "value.h"
 #include "object.h"
+#include "compiler.h"
+
+#ifdef DEBUG_LOG_GC
+#include <stdio.h>
+#include "debug.h"
+#endif
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+    if (newSize > oldSize) {
+#ifdef DEBUG_STRESS_GC
+        collectGarbage();
+#endif
+    }
+
     if (newSize == 0) {
         free(pointer);
         return NULL;
@@ -24,6 +36,9 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 }
 
 static void freeObject(Obj* object) {
+#ifdef DEBUG_LOG_GC
+    printf("%p freed, type %d\n", (void*)object, object->type);
+#endif
     switch (object->type) {
         case OBJ_STRING: {
             ObjString* string = (ObjString*)object;
@@ -56,6 +71,35 @@ static void freeObject(Obj* object) {
     }
 }
 
+void markObject(Obj* obj) {
+    if (obj == NULL) return;
+    obj->isMarked = true;
+
+#ifdef DEBUG_LOG_GC
+    printf("%p mark", (void*)obj);
+    printValue(OBJ_VAL(obj));
+    printf("\n");
+#endif
+}
+
+void markValue(Value val) {
+    if (IS_OBJ(val)) markObject(AS_OBJ(val));
+}
+
+static void markRoots() {
+    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        markValue(*slot);
+    }
+    markTable(&vm.globals);
+    for (int i = 0; i < vm.frameCount; i++) {
+        markObject((Obj*)vm.frames[i].closure);
+    }
+    for (ObjUpvalue* upvalue = vm.openUpvalues; upvalue != NULL; upvalue = upvalue->next) {
+        markObject((Obj*)upvalue);
+    }
+    markCompilerRoots();
+}
+
 void freeObjects() {
     Obj* object = vm.objs;
     while (object != NULL) {
@@ -63,4 +107,17 @@ void freeObjects() {
         freeObject(object);
         object = next;
     }
+}
+
+void collectGarbage() {
+#ifdef DEBUG_LOG_GC
+    printf("-- gc begin");
+#endif
+
+    // Marks the "roots" of the dyanmic memory
+    markRoots();
+
+#ifdef DEBUG_LOG_GC
+    printf("-- gc end\n");
+#endif
 }

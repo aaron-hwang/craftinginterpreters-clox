@@ -37,6 +37,7 @@ typedef enum {
 struct Obj {
     ObjType type;
     struct Obj* next;
+    bool isMarked;
 };
 
 // In lox, functions are first class.
