@@ -73,6 +73,7 @@ typedef struct ObjUpvalue {
     Obj obj;
     // Important that this is a pointer, as it needs to be aware of any changes to the variable that happen at runtime
     Value* location;
+    Value closed;
     // Each open upvalue points to the next open upvalue referencing a local var farther in the stack
     struct ObjUpvalue* next;
 } ObjUpvalue;

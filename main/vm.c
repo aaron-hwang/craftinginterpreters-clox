@@ -176,6 +176,19 @@ static ObjUpvalue* captureUpvalue(Value* local) {
     return createdUpvalue;
 }
 
+/**
+ * Helper function to close known
+ * @param last
+ */
+static void closeUpvalues(Value* last) {
+    while (vm.openUpvalues != NULL && vm.openUpvalues->location >= last) {
+        ObjUpvalue* upvalue = vm.openUpvalues;
+        upvalue->closed = *upvalue->location;
+        upvalue->location = &upvalue->closed;
+        vm.openUpvalues = upvalue->next;
+    }
+}
+
 static bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -228,6 +241,7 @@ static InterpretResult run() {
         switch(instruction = READ_BYTE()) {
             case OP_RETURN: {
                 Value result = pop();
+                closeUpvalues(frame->slots);
                 vm.frameCount--;
                 // We returned from the top level successfully
                 if (vm.frameCount == 0) {
@@ -382,6 +396,11 @@ static InterpretResult run() {
             case OP_SET_UPVALUE: {
                 uint8_t slot = READ_BYTE();
                 *frame->closure->upvalues[slot]->location = peek(0);
+                break;
+            }
+            case OP_CLOSE_UPVALUE: {
+                closeUpvalues(vm.stackTop - 1);
+                pop();
                 break;
             }
         }

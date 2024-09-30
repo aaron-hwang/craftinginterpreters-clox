@@ -27,3 +27,9 @@ Features currently implemented that are outlined by the book:
 - Variables
 - Closures/local scope for functions and variables
 - Dynamically typed variables
+
+Features currently implemented that are suggested but not gone over:
+- 
+
+Features planned that are gone over in the book:
+- Garbage collection
