@@ -170,6 +170,28 @@ void freeObjects() {
     free(vm.grayStack);
 }
 
+static void sweep() {
+    Obj* previous = NULL;
+    Obj* obj = vm.objs;
+    while (obj != NULL) {
+        if (obj->isMarked) {
+            obj->isMarked = false;
+            previous = obj;
+            obj = obj->next;
+        } else {
+            Obj* unreached = obj;
+            obj = obj->next;
+            if (previous != NULL) {
+                previous->next = obj;
+            } else {
+                vm.objs = obj;
+            }
+
+            freeObject(unreached);
+        }
+    }
+}
+
 // The main garbage collection funtion
 /**
  * High level overview of how it works:
@@ -185,7 +207,7 @@ void freeObjects() {
  * 3. Visit all gray nodes, visit their references
  * 4. Mark the original grey node black
  * Repeat 3 and 4 while grey nodes exist
- * Any white objects remaining can be gc'ed
+ * 5. Any white objects remaining can be gc'ed
  * It can be seen that a black object will never point to a white object according to the above rules:
  * tricolor invariant
  */
@@ -194,9 +216,12 @@ void collectGarbage() {
     printf("-- gc begin");
 #endif
 
-    // Marks the "roots" of the dyanmic memory
+    // Marks the "roots" of the dyanmic memory as grey
     markRoots();
+    // Steps 3 and 4
     traceReferences();
+    // ste[ 5
+    sweep();
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
