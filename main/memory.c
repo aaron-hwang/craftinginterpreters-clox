@@ -107,6 +107,9 @@ static void markRoots() {
     for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
         markValue(*slot);
     }
+    // We intentionally do not mark our table of interned strings, since they are a little special.
+    // Marking them normally would lead to us never collecting any strings
+    // manually marking is also bad since we would just have a bunch of dangling pointers
     markTable(&vm.globals);
     for (int i = 0; i < vm.frameCount; i++) {
         markObject((Obj*)vm.frames[i].closure);
@@ -220,7 +223,8 @@ void collectGarbage() {
     markRoots();
     // Steps 3 and 4
     traceReferences();
-    // ste[ 5
+    tableRemoveWhite(&vm.strings);
+    // step 5
     sweep();
 
 #ifdef DEBUG_LOG_GC
