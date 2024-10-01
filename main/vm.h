@@ -36,6 +36,9 @@ typedef struct {
 	ObjUpvalue* openUpvalues;
     // Keeps track of all global variables
     Table globals;
+	int grayCount;
+	int grayCapacity;
+	Obj** grayStack;
 } VM;
 
 typedef enum {

@@ -72,8 +72,19 @@ static void freeObject(Obj* object) {
 }
 
 void markObject(Obj* obj) {
-    if (obj == NULL) return;
+    // Second condition avoids cycles
+    if (obj == NULL || obj->isMarked) return;
     obj->isMarked = true;
+
+    if (vm.grayCapacity < vm.grayCount + 1) {
+        vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
+        // Manage the stack ourselves to avoid recursive gc
+        vm.grayStack = (Obj**)realloc(vm.grayStack, sizeof(Obj*) * vm.grayCapacity);
+        // Basically screwed if this fails
+        if (vm.grayStack == NULL) exit(1);
+    }
+
+    vm.grayStack[vm.grayCount++] = obj;
 
 #ifdef DEBUG_LOG_GC
     printf("%p mark", (void*)obj);
@@ -84,6 +95,12 @@ void markObject(Obj* obj) {
 
 void markValue(Value val) {
     if (IS_OBJ(val)) markObject(AS_OBJ(val));
+}
+
+static void markArray(ValueArray* array) {
+    for (int i = 0; i < array->capacity; i++) {
+        markValue(array->values[i]);
+    }
 }
 
 static void markRoots() {
@@ -100,6 +117,48 @@ static void markRoots() {
     markCompilerRoots();
 }
 
+// A black object is any object whose 'isMarked' field is set, and is no longer in the gray stack of the vm
+static void blackenObject(Obj* obj) {
+#ifdef DEBUG_LOG_GC
+    printf("%p blacken ", (void*)obj);
+    printValue(OBJ_VAL(obj));
+    printf("\n");
+#endif
+
+
+    switch (obj->type) {
+        case OBJ_UPVALUE: {
+            markValue(((ObjUpvalue*)obj)->closed);
+            break;
+        }
+        case OBJ_FUNCTION: {
+            ObjFunction* function = (ObjFunction*)obj;
+            markObject((Obj*)function->name);
+            markArray(&function->chunk.constants);
+        }
+        case OBJ_CLOSURE: {
+            ObjClosure* closure = (ObjClosure*)obj;
+            markObject((Obj*)closure->function);
+            for (int i = 0; i < closure->upvalueCount; i++) {
+                markObject((Obj*)closure->upvalues[i]);
+
+            }
+            break;
+        }
+        // Nothing to do
+        case OBJ_NATIVE:
+        case OBJ_STRING:
+            break;
+    }
+}
+
+static void traceReferences() {
+    while (vm.grayCount > 0) {
+        Obj* object = vm.grayStack[vm.grayCount--];
+        blackenObject(object);
+    }
+}
+
 void freeObjects() {
     Obj* object = vm.objs;
     while (object != NULL) {
@@ -107,8 +166,29 @@ void freeObjects() {
         freeObject(object);
         object = next;
     }
+
+    free(vm.grayStack);
 }
 
+// The main garbage collection funtion
+/**
+ * High level overview of how it works:
+ * Using the tricolor abstraction, every object we dynamically allocate memory for can be in one of three
+ * states:
+ * White - The object has not yet been traversed or encountered by our GC algorithm
+ * Gray - The object is reachable (should not be collected), but we have not explored this node's neighbors
+ * Black - After an object is marked and all of its references are marked
+ *
+ * In other words,
+ * 1. Start with every node white
+ * 2. Visit all roots, marking them grey,
+ * 3. Visit all gray nodes, visit their references
+ * 4. Mark the original grey node black
+ * Repeat 3 and 4 while grey nodes exist
+ * Any white objects remaining can be gc'ed
+ * It can be seen that a black object will never point to a white object according to the above rules:
+ * tricolor invariant
+ */
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin");
@@ -116,6 +196,7 @@ void collectGarbage() {
 
     // Marks the "roots" of the dyanmic memory
     markRoots();
+    traceReferences();
 
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");

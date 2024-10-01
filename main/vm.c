@@ -79,6 +79,10 @@ void initVM() {
     initTable(&vm.strings);
     initTable(&vm.globals);
 
+    vm.grayCount = 0;
+    vm.grayCapacity = 0;
+    vm.grayStack = NULL;
+
     // Native functions go HERE
     defineNative("clock", clockNative);
 }
