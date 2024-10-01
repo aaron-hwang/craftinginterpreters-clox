@@ -13,16 +13,24 @@
 #include "object.h"
 #include "compiler.h"
 
+// Technically arbitrary, for performance ideally profile and test different factors
+#define GC_HEAP_GROW_FACTOR 2
+
 #ifdef DEBUG_LOG_GC
 #include <stdio.h>
 #include "debug.h"
 #endif
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
+    vm.bytesAllocated += newSize - oldSize;
     if (newSize > oldSize) {
 #ifdef DEBUG_STRESS_GC
         collectGarbage();
 #endif
+    }
+
+    if (vm.bytesAllocated >= vm.nextGC) {
+        collectGarbage();
     }
 
     if (newSize == 0) {
@@ -213,11 +221,15 @@ static void sweep() {
  * 5. Any white objects remaining can be gc'ed
  * It can be seen that a black object will never point to a white object according to the above rules:
  * tricolor invariant
+ *
+ * As memory is allocated and freed during the program's lifetime, the frequency with which GC is run automatically
+ * adjusts, increasing with less memory and decreasing with more.
  */
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
     printf("-- gc begin");
 #endif
+    size_t prev = vm.bytesAllocated;
 
     // Marks the "roots" of the dyanmic memory as grey
     markRoots();
@@ -227,7 +239,11 @@ void collectGarbage() {
     // step 5
     sweep();
 
+    vm.nextGC = vm.bytesAllocated * GC_HEAP_GROW_FACTOR;
+
 #ifdef DEBUG_LOG_GC
     printf("-- gc end\n");
+    printf("    Collected %zu bytes (from %zu to %zu) next at %zu\n",
+        prev-vm.bytesAllocated, prev, vm.bytesAllocated, vm.nextGC);
 #endif
 }

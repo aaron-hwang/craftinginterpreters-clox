@@ -39,6 +39,9 @@ typedef struct {
 	int grayCount;
 	int grayCapacity;
 	Obj** grayStack;
+	// Values we use to auto adjust GC frequency
+	size_t bytesAllocated;
+	size_t nextGC;
 } VM;
 
 typedef enum {
