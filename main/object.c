@@ -75,9 +75,11 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+    push(OBJ_VAL(string));
     // String interning: Causes slight perf overhead for every allocation, but greatly improves performance when
     // Doing comoparisons (checking for function names)
     tableSet(&vm.strings, string, NIL_VAL);
+    pop();
     return string;
 }
 

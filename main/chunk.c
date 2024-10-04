@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "chunk.h"
 #include "memory.h"
+#include "vm.h"
 
 void initChunk(Chunk* chunk) {
     chunk->count = 0;
@@ -37,7 +38,12 @@ void freeChunk(Chunk* chunk) {
 
 // Returns the index where the given value was appended
 int addConstant(Chunk* chunk, Value value) {
+    // Each chunk owns a constant table, which is a dynamic array. That might need to grow and call
+    // reallocate, which can trigger a gc. That gc may sweep up "value" even though we still need it.
+    // Popping it onto the stack before we try to reallocate fixes this.
+    push(value);
     writeValueArray(&chunk->constants, value);
+    pop(value);
     return chunk->constants.count - 1;
 }
 

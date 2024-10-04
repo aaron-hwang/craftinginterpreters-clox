@@ -106,7 +106,7 @@ void markValue(Value val) {
 }
 
 static void markArray(ValueArray* array) {
-    for (int i = 0; i < array->capacity; i++) {
+    for (int i = 0; i < array->count; i++) {
         markValue(array->values[i]);
     }
 }
@@ -146,6 +146,7 @@ static void blackenObject(Obj* obj) {
             ObjFunction* function = (ObjFunction*)obj;
             markObject((Obj*)function->name);
             markArray(&function->chunk.constants);
+            break;
         }
         case OBJ_CLOSURE: {
             ObjClosure* closure = (ObjClosure*)obj;
@@ -165,7 +166,7 @@ static void blackenObject(Obj* obj) {
 
 static void traceReferences() {
     while (vm.grayCount > 0) {
-        Obj* object = vm.grayStack[vm.grayCount--];
+        Obj* object = vm.grayStack[--vm.grayCount];
         blackenObject(object);
     }
 }
@@ -227,9 +228,9 @@ static void sweep() {
  */
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
-    printf("-- gc begin");
-#endif
+    printf("-- gc begin\n");
     size_t prev = vm.bytesAllocated;
+#endif
 
     // Marks the "roots" of the dyanmic memory as grey
     markRoots();
