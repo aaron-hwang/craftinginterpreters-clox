@@ -27,6 +27,13 @@ static Obj* allocateObject(size_t size, ObjType type) {
     return object;
 }
 
+ObjClass* newCLass(ObjString* name) {
+    // variable name of "klass" makes this c++ compatible
+    ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name = name;
+    return klass;
+}
+
 ObjClosure* newClosure(ObjFunction* function) {
     ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
     for (int i = 0; i < function->upvalueCount; i++) {
@@ -157,6 +164,10 @@ void printObject(Value value) {
         // Not particularly useful to an end user, probably will never be called realistically.
         case OBJ_UPVALUE: {
             printf("upvalue");
+            break;
+        }
+        case OBJ_CLASS: {
+            printf("Class %s", AS_CLASS(value)->name->chars);
             break;
         }
         default: return;
