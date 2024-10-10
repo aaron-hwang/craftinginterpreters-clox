@@ -411,6 +411,10 @@ static InterpretResult run() {
                 pop();
                 break;
             }
+            case OP_CLASS: {
+                push(OBJ_CLASS(newClass(READ_STRING())));
+                break;
+            }
         }
     }
 

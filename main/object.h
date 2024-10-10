@@ -18,6 +18,7 @@
 #define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_CLASS(value) isObjType(value, OB_CLASS)
+#define IS_INSTANCE(value) isObjType(value, OBJ_CLASS)
 
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
@@ -26,10 +27,12 @@
 #define AS_NATIVE(value) \
     ((ObjNative*)AS_OBJ(value))->function
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
+#define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
+    OBJ_INSTANCE,
     // Special type of object, native functions
     OBJ_NATIVE,
     OBJ_CLOSURE,
@@ -101,6 +104,15 @@ typedef struct {
 } ObjClass;
 
 ObjClass* newClass(ObjString* name);
+
+// The runtime representation of an instance of a given class in Lox. 
+typedef struct {
+    Obj obj;
+    ObjClass* klass;
+    Table fields;
+} ObjInstance;
+
+ObjInstance* newInstance(ObjClass* klass);
 
 ObjString* copyString(const char* chars, int length);
 ObjString* takeString(char* chars, int length);

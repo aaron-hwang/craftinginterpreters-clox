@@ -59,6 +59,14 @@ ObjFunction* newFunction() {
     return function;
 }
 
+
+ObjInstance* newInstance(ObjClass* klass) {
+    ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    initTable(&instance->fields);
+    instance->klass = klass;
+    return instance;
+}
+
 /**
  * Creates a new function object from a prexisting
  * @param function

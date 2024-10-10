@@ -11,6 +11,7 @@
 // potentially todo: implement seperate opcodes for "<=", ">=", "!=" for better perf
 typedef enum {
     OP_RETURN,
+    OP_CLASS,
     OP_CONSTANT,
     OP_NIL,
     OP_TRUE,
