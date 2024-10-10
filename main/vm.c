@@ -152,6 +152,11 @@ static bool callValue(Value callee, int argcount) {
             case OBJ_CLOSURE: {
                 return call(AS_CLOSURE(callee), argcount);
             }
+            case OBJ_CLASS: {
+                ObjClass* klass = AS_CLASS(callee);
+                vm.stackTop[-argcount - 1] = OBJ_VAL(newInstance(klass));
+                return true;
+            }
             default:
                 break; // Not a callable object type
         }
@@ -413,6 +418,40 @@ static InterpretResult run() {
             }
             case OP_CLASS: {
                 push(OBJ_CLASS(newClass(READ_STRING())));
+                break;
+            }
+            //
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(peek(0))) {
+                    runtimeError("Only instances of classes have fields");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjInstance* instance = AS_INSTANCE(peek(0));
+                ObjString* name = READ_STRING();
+
+                Value value;
+                // Attempt to look up the given identifier in the pool of this object's fields
+                if (tableGet(&instance->fields, name, &value)) {
+                    pop();
+                    push(value);
+                    break;
+                }
+
+                runtimeError("Undefined field '%s'", name->chars);
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            // TODO: Implement a strategy to handle deletion of fields from a class
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(peek(1))) {
+                    runtimeError("Only instances of classes may have their fields set");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                ObjInstance* instance = AS_INSTANCE(peek(0));
+                tableSet(&instance->fields, READ_STRING(), peek(0));
+                // The value of a setter is in of itself an expression that evalutates to the set value
+                Value value = pop();
+                pop();
+                push(value);
                 break;
             }
         }

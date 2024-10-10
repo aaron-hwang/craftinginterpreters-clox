@@ -178,6 +178,9 @@ void printObject(Value value) {
             printf("Class %s", AS_CLASS(value)->name->chars);
             break;
         }
+        case OBJ_INSTANCE: {
+            printf("Instance of %s", AS_INSTANCE(value)->klass->name->chars);
+        }
         default: return;
     }
 }
