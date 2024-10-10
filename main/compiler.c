@@ -509,6 +509,15 @@ static void function(FunctionType type) {
     }
 }
 
+static void method() {
+    consume(TOKEN_IDENTIFIER, "Expected a method name");
+    uint8_t constant = identifierConstant(&parser.previous);
+    FunctionType type = TYPE_FUNCTION;
+    function(type);
+
+    emitBytes(OP_METHOD, constant);
+}
+
 static void funDeclaration() {
     uint8_t global = parseVariable("Expect function name");
     markInitialized();
@@ -733,14 +742,22 @@ static void varDeclaration() {
 
 static void classDeclaration() {
     consume(TOKEN_IDENTIFIER, "Expected class name after class declaration");
+    Token classname = parser.previous;
     uint8_t name = identifierConstant(&parser.previous);
     declareVariable();
 
     emitBytes(OP_CLASS, name);
     defineVariable(name);
 
+    namedVariable(classname, false);
     consume(TOKEN_LEFT_BRACE, "Expected '{' after class name");
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+        // In lox, we don't have field declarations explicitly in the class
+        method();
+    }
     consume(TOKEN_RIGHT_BRACE, "Expected '}' after class body");
+    // pop the name of the class BACK onto the stack so that the methods we defined can then bind to this class
+    emitByte(OP_POP);
 }
 
 static void declaration() {

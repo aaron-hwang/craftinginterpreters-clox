@@ -101,6 +101,7 @@ ObjClosure* newClosure(ObjFunction* function);
 typedef struct {
     Obj obj;
     ObjString* name;
+    Table methods;
 } ObjClass;
 
 ObjClass* newClass(ObjString* name);

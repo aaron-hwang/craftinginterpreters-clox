@@ -220,6 +220,13 @@ static void concatenate() {
     push(OBJ_VAL(result));
 }
 
+static void defineMethod(ObjString* methodName) {
+    Value method = peek(0);
+    ObjClass* klass = AS_CLASS(peek(1));
+    tableSet(&klass->methods, methodName, method);
+    pop();
+}
+
 // The main function of our VM, the "beating heart" so to speak.
 static InterpretResult run() {
     CallFrame* frame = &vm.frames[vm.frameCount - 1];
@@ -452,6 +459,10 @@ static InterpretResult run() {
                 Value value = pop();
                 pop();
                 push(value);
+                break;
+            }
+            case OP_METHOD: {
+                defineMethod(READ_STRING());
                 break;
             }
         }
