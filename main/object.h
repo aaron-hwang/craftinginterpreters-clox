@@ -19,6 +19,7 @@
 #define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
 #define IS_CLASS(value) isObjType(value, OB_CLASS)
 #define IS_INSTANCE(value) isObjType(value, OBJ_CLASS)
+#define IS_BOUND(value) isObjType(value, OBJ_BOUND_METHOD)
 
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
@@ -28,6 +29,7 @@
     ((ObjNative*)AS_OBJ(value))->function
 #define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 #define AS_INSTANCE(value) ((ObjInstance*)AS_OBJ(value))
+#define AS_BOUND(value) ((ObjBoundMethod*)AS_OBJ(value))
 
 typedef enum {
     OBJ_STRING,
@@ -38,6 +40,7 @@ typedef enum {
     OBJ_CLOSURE,
     OBJ_UPVALUE,
     OBJ_CLASS,
+    OBJ_BOUND_METHOD,
 } ObjType;
 
 struct Obj {
@@ -114,6 +117,14 @@ typedef struct {
 } ObjInstance;
 
 ObjInstance* newInstance(ObjClass* klass);
+
+typedef struct {
+    Obj obj;
+    Value receiver;
+    ObjClosure* method;
+} ObjBoundMethod;
+
+ObjBoundMethod* newBoundMethod(ObjClosure* method, Value receiver);
 
 ObjString* copyString(const char* chars, int length);
 ObjString* takeString(char* chars, int length);

@@ -80,6 +80,19 @@ ObjNative* newNative(NativeFn function) {
 }
 
 /**
+ * Creates a new instance of a 'bound method'; A runtime representation of a bound method
+ * @param method
+ * @param receiver
+ * @return
+ */
+ObjBoundMethod* newBoundMethod(ObjClosure* method, Value receiver) {
+    ObjBoundMethod* bound_method = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound_method->method = method;
+    bound_method->receiver = receiver;
+    return bound_method;
+}
+
+/**
  * Allocates a Lox String, and interns it for future lookup
  * @param chars The raw C string we are allocating
  * @param length tne length of said string
