@@ -143,6 +143,8 @@ static void markRoots() {
         markObject((Obj*)upvalue);
     }
     markCompilerRoots();
+    // Make sure we don't accidentally gc our init keyword!
+    markObject((Obj*)vm.initString);
 }
 
 // A black object is any object whose 'isMarked' field is set, and is no longer in the gray stack of the vm

@@ -79,6 +79,11 @@ void initVM() {
     initTable(&vm.strings);
     initTable(&vm.globals);
 
+    // Copying a string can trigger a GC, so we init to NULL first
+    // so that our GC doesn't read an uninitialized field
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);
+
     vm.grayCount = 0;
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
@@ -93,6 +98,7 @@ void initVM() {
 void freeVM() {
     freeTable(&vm.globals);
     freeTable(&vm.strings);
+    vm.initString = NULL;
     freeObjects();
 }
 
@@ -155,12 +161,21 @@ static bool callValue(Value callee, int argcount) {
             case OBJ_CLASS: {
                 ObjClass* klass = AS_CLASS(callee);
                 vm.stackTop[-argcount - 1] = OBJ_VAL(newInstance(klass));
+                // Whenever we create a new instance of a class, attempt to call 'init(...)' if defined
+                Value initializer;
+                if (!tableGet(&klass->methods, vm.initString, &initializer)) {
+                    return call(AS_CLOSURE(initializer), argcount);
+                } else if (argcount != 0) {
+                    runtimeError("Expected 0 arguments for class initializer, got %d", argcount);
+                    return false;
+                }
                 return true;
             }
             case OBJ_BOUND_METHOD: {
                 ObjBoundMethod* bound_method = AS_BOUND(callee);
                 // Ensures the receiver is in slot 0.
                 vm.stackTop[-argcount - 1] = bound_method->receiver;
+
                 return call(bound_method->method, argcount);
             }
             default:

@@ -66,6 +66,7 @@ typedef enum {
     TYPE_FUNCTION,
     TYPE_SCRIPT,
     TYPE_METHOD,
+    TYPE_INITIALIZER,
 } FunctionType;
 
 // The compiler of a given function; At a high level, lox starts in an empty top level function,
@@ -198,7 +199,12 @@ static int emitJump(uint8_t instruction) {
 }
 
 static void emitReturn() {
-    emitByte(OP_NIL);
+    if (current->type == TYPE_INITIALIZER) {
+        // slot zero contains the instance of the class
+        emitBytes(OP_GET_LOCAL, 0);
+    } else {
+        emitByte(OP_NIL);
+    }
     emitByte(OP_RETURN);
 }
 
@@ -528,6 +534,9 @@ static void method() {
     consume(TOKEN_IDENTIFIER, "Expected a method name");
     uint8_t constant = identifierConstant(&parser.previous);
     FunctionType type = TYPE_METHOD;
+    if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+        type = TYPE_INITIALIZER;
+    }
     function(type);
 
     emitBytes(OP_METHOD, constant);
@@ -556,6 +565,10 @@ static void returnStatement() {
     if (match(TOKEN_SEMICOLON)) {
         emitReturn();
     } else {
+        if (current->type == TYPE_INITIALIZER) {
+            error("Cannot return a value from an initializer");
+        }
+
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value");
         emitByte(OP_RETURN);

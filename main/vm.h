@@ -32,7 +32,9 @@ typedef struct {
     Obj* objs;
     // Keeps track of all strings recorded so far, for string interning
     Table strings;
-
+	// Special string we intern for fast lookup;
+	// Defines the string we use to define the initailizer method of a class
+	ObjString* initString;
 	ObjUpvalue* openUpvalues;
     // Keeps track of all global variables
     Table globals;
