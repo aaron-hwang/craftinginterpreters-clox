@@ -157,12 +157,37 @@ static bool callValue(Value callee, int argcount) {
                 vm.stackTop[-argcount - 1] = OBJ_VAL(newInstance(klass));
                 return true;
             }
+            case OBJ_BOUND_METHOD: {
+                ObjBoundMethod* bound_method = AS_BOUND(callee);
+                return call(bound_method->method, argcount);
+            }
             default:
                 break; // Not a callable object type
         }
     }
     runtimeError("Can only call functions and classes");
     return false;
+}
+
+/**
+ * Binds a method call to a given instance of a class.
+ * @param klass The class to bind to
+ * @param name the name of the method being called
+ * @return true if the binding succeeded, false otherwise
+ */
+static bool bindMethod(ObjClass* klass, ObjString* name) {
+    Value method;
+    bool isTrue = !tableGet(&klass->methods, name, &method);
+    if(isTrue) {
+        runtimeError("Unknown property of '%s', '%s'", klass->name->chars, name->chars);
+        return false;
+    }
+
+    ObjBoundMethod* bound_method = newBoundMethod(AS_CLOSURE(method), peek(0));
+
+    pop();
+    push(OBJ_VAL(bound_method));
+    return true;
 }
 
 static ObjUpvalue* captureUpvalue(Value* local) {
@@ -437,12 +462,18 @@ static InterpretResult run() {
                 ObjInstance* instance = AS_INSTANCE(peek(0));
                 ObjString* name = READ_STRING();
 
+                // note: fields take prevedence over methods
                 Value value;
                 // Attempt to look up the given identifier in the pool of this object's fields
                 if (tableGet(&instance->fields, name, &value)) {
                     pop();
                     push(value);
                     break;
+                }
+
+                // If we could not bind this method call to an instance of the given class either
+                if (!bindMethod(instance->klass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
                 }
 
                 runtimeError("Undefined field '%s'", name->chars);
