@@ -89,6 +89,10 @@ static void freeObject(Obj* object) {
             FREE(ObjInstance, object);
             break;
         }
+        case OBJ_BOUND_METHOD: {
+            FREE(ObjBoundMethod, object);
+            break;
+        }
     }
 }
 
@@ -180,6 +184,12 @@ static void blackenObject(Obj* obj) {
             ObjInstance* instance = (ObjInstance*)obj;
             markObject((Obj*)instance->klass);
             markTable(&instance->fields);
+            break;
+        }
+        case OBJ_BOUND_METHOD: {
+            ObjBoundMethod* method = (ObjBoundMethod*)obj;
+            markValue(method->receiver);
+            markObject((Obj*)method->method);
             break;
         }
         // Nothing to do

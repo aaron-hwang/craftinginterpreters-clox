@@ -195,6 +195,10 @@ void printObject(Value value) {
         case OBJ_INSTANCE: {
             printf("Instance of %s", AS_INSTANCE(value)->klass->name->chars);
         }
+        case OBJ_BOUND_METHOD: {
+            printFunction(AS_BOUND(value)->method->function);
+            break;
+        }
         default: return;
     }
 }
