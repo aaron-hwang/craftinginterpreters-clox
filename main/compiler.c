@@ -65,6 +65,7 @@ typedef struct {
 typedef enum {
     TYPE_FUNCTION,
     TYPE_SCRIPT,
+    TYPE_METHOD,
 } FunctionType;
 
 // The compiler of a given function; At a high level, lox starts in an empty top level function,
@@ -81,8 +82,13 @@ typedef struct Compiler{
     Upvalue upvalues[UINT8_COUNT];
 } Compiler;
 
+typedef struct ClassCompiler {
+    struct ClassCompiler* enclosing;
+} ClassCompiler;
+
 Parser parser;
 Compiler* current = NULL;
+ClassCompiler* currentClass = NULL;
 //Chunk* compilingChunk;
 
 // Prototypes for very important functions
@@ -376,6 +382,15 @@ static void variable(bool canAssign) {
     namedVariable(parser.previous, canAssign);
 }
 
+static void this_(bool canAssign) {
+    // We are in a top level context, so 'this' doesn't make sense
+    if (currentClass == NULL) {
+        error("Cannot use 'this' outside of a class");
+        return;
+    }
+    variable(false);
+}
+
 // Note: OP_NEGATE is meant to be emitted last
 static void unary(bool canAssign) {
     TokenType operatorType = parser.previous.type;
@@ -430,7 +445,7 @@ ParseRule rules[] = {
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_THIS]          = {this_,     NULL,   PREC_NONE},
   [TOKEN_TRUE]          = {literal,     NULL,   PREC_NONE},
   [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
@@ -512,7 +527,7 @@ static void function(FunctionType type) {
 static void method() {
     consume(TOKEN_IDENTIFIER, "Expected a method name");
     uint8_t constant = identifierConstant(&parser.previous);
-    FunctionType type = TYPE_FUNCTION;
+    FunctionType type = TYPE_METHOD;
     function(type);
 
     emitBytes(OP_METHOD, constant);
@@ -749,6 +764,10 @@ static void classDeclaration() {
     emitBytes(OP_CLASS, name);
     defineVariable(name);
 
+    ClassCompiler class_compiler;
+    class_compiler.enclosing = currentClass;
+    currentClass = &class_compiler;
+
     namedVariable(classname, false);
     consume(TOKEN_LEFT_BRACE, "Expected '{' after class name");
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
@@ -758,6 +777,8 @@ static void classDeclaration() {
     consume(TOKEN_RIGHT_BRACE, "Expected '}' after class body");
     // pop the name of the class BACK onto the stack so that the methods we defined can then bind to this class
     emitByte(OP_POP);
+
+    currentClass = currentClass->enclosing;
 }
 
 static void declaration() {

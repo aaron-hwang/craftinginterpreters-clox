@@ -159,6 +159,8 @@ static bool callValue(Value callee, int argcount) {
             }
             case OBJ_BOUND_METHOD: {
                 ObjBoundMethod* bound_method = AS_BOUND(callee);
+                // Ensures the receiver is in slot 0.
+                vm.stackTop[-argcount - 1] = bound_method->receiver;
                 return call(bound_method->method, argcount);
             }
             default:
