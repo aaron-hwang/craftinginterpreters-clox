@@ -270,6 +270,33 @@ static void defineMethod(ObjString* methodName) {
     pop();
 }
 
+static bool invokeFromClass(ObjClass* klass, ObjString* method_name, int argc) {
+    Value method;
+    if(!tableGet(&klass->methods, method_name, &method)) {
+        runtimeError("Class %s does not have method %s.", klass->name->chars, method_name->chars);
+        return false;
+    }
+    return call(AS_CLOSURE(method), argc);
+}
+
+/**
+ *
+ * @param method_name The name of the method to invoke
+ * @param argc The amount of arguments to use
+ * @return Whether or not the invocation was successful
+ */
+static bool invoke(ObjString* method_name, int argc) {
+    // The arguments we passed are right above the callee on the stack, so just peek argc down to grab it.
+    Value receiver = peek(argc);
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instances may have/call methods");
+        return false;
+    }
+
+    ObjInstance* instance = AS_STRING(receiver);
+    return invokeFromClass(instance->klass, method_name, argc);
+}
+
 // The main function of our VM, the "beating heart" so to speak.
 static InterpretResult run() {
     CallFrame* frame = &vm.frames[vm.frameCount - 1];
@@ -512,6 +539,15 @@ static InterpretResult run() {
             }
             case OP_METHOD: {
                 defineMethod(READ_STRING());
+                break;
+            }
+            case OP_INVOKE: {
+                ObjString* method = READ_STRING();
+                int argc = READ_BYTE();
+                if (!invoke(method, argc)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frameCount - 1];
                 break;
             }
         }

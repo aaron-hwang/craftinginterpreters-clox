@@ -43,6 +43,8 @@ typedef enum {
     OP_CLOSE_UPVALUE,
     OP_NOT,
     OP_METHOD,
+    // A fusion of OP_GET_PROPERTY and OP_CALL (Invoked when you do className.method(args))
+    OP_INVOKE,
 } OpCode;
 
 typedef struct {
