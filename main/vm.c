@@ -293,7 +293,18 @@ static bool invoke(ObjString* method_name, int argc) {
         return false;
     }
 
-    ObjInstance* instance = AS_STRING(receiver);
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    // Handles the case where we have a field that returns a callable value
+    // Optimization loop:
+    // Find a commmon operation/series of operations that are perf critical
+    // Add an optimized implementation of that pattern
+    // Guard wthe optimization with code that ensures it actually applies. If not, fall back to less opt code.
+    Value value;
+    if (!tableGet(&instance->klass->methods, method_name, &value)) {
+        vm.stackTop[-argc - 1] = value;
+        return callValue(value, argc);
+    }
     return invokeFromClass(instance->klass, method_name, argc);
 }
 
